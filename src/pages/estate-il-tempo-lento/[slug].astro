@@ -1,0 +1,172 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { dateToSlug } from '../../utils/slug';
+import { formatItalianDate } from '../../utils/date';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('posts');
+
+  // Guardrail (CLAUDE.md): se due post risolvono nello stesso slug — cioè hanno
+  // la stessa data — il build DEVE fallire, invece di far sovrascrivere
+  // silenziosamente un post dall'altro. Non rimuovere questo controllo.
+  const seen = new Map<string, string>();
+  for (const post of posts) {
+    const slug = dateToSlug(post.data.date);
+    const existing = seen.get(slug);
+    if (existing) {
+      throw new Error(
+        `Slug duplicato "${slug}": i post "${existing}" e "${post.id}" ` +
+          `risolvono nella stessa data. Un solo post al giorno.`
+      );
+    }
+    seen.set(slug, post.id);
+  }
+
+  return posts.map((post) => ({
+    params: { slug: dateToSlug(post.data.date) },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<Base description={post.data.excerpt}>
+  <article class="post">
+    <img class="bg" src={post.data.image} alt="" />
+    <a class="back" href="/" aria-label="Torna all'archivio">←</a>
+    <div class="overlay">
+      <div class="text">
+        <time class="date" datetime={post.data.date.toISOString()}>
+          {formatItalianDate(post.data.date)}
+        </time>
+        {post.data.excerpt && <p class="excerpt">{post.data.excerpt}</p>}
+        <div class="body">
+          <Content />
+        </div>
+      </div>
+    </div>
+  </article>
+</Base>
+
+<style>
+  .post {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    transform-origin: center;
+    animation: kenburns 18s ease-out both;
+  }
+
+  @keyframes kenburns {
+    from {
+      transform: scale(1.12);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  .back {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 2;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    color: #fff;
+    text-decoration: none;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+    border-radius: 999px;
+  }
+
+  .back:hover,
+  .back:focus-visible {
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  .overlay {
+    position: relative;
+    z-index: 1;
+    margin-top: auto;
+    width: 100%;
+    padding: 12rem 1.5rem 3rem;
+    color: #fff;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.9) 0%,
+      rgba(0, 0, 0, 0.55) 40%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  }
+
+  .text {
+    max-width: none;
+    margin: 0;
+    text-align: left;
+    animation: rise 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(1.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .date {
+    display: block;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .excerpt {
+    margin: 0 0 1.5rem;
+    font-family: var(--display);
+    font-size: clamp(1.9rem, 4.4vw, 3rem);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.3;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+  }
+
+  .body {
+    font-size: clamp(1.35rem, 2.8vw, 1.75rem);
+    line-height: 1.7;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
+  }
+
+  .body :global(p) {
+    margin: 0 0 1rem;
+  }
+
+  .body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bg,
+    .text {
+      animation: none;
+    }
+  }
+</style>
