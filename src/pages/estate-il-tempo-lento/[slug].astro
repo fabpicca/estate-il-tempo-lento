@@ -36,7 +36,7 @@ const { Content } = await render(post);
 <Base
   description={post.data.excerpt}
   image={post.data.image}
-  title={formatItalianDate(post.data.date)}
+  title={post.data.excerpt ?? formatItalianDate(post.data.date)}
   type="article"
 >
   <article class="post">
