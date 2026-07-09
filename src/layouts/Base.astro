@@ -2,8 +2,29 @@
 // Layout di base. Definisce lang="it" e la baseline di stile globale.
 interface Props {
   description?: string;
+  // Immagine per l'anteprima social (Open Graph): path statico come nel
+  // frontmatter, es. "/images/2026-07-08.jpg".
+  image?: string;
+  // Titolo della card social. Se assente usa il nome del sito.
+  title?: string;
+  // "article" per i singoli post, "website" per il resto.
+  type?: 'website' | 'article';
 }
-const { description } = Astro.props;
+const {
+  description,
+  image,
+  title,
+  type = 'website',
+} = Astro.props;
+
+const siteName = 'Estate, il tempo lento';
+const ogTitle = title ?? siteName;
+
+// Le anteprime social richiedono URL ASSOLUTI: si costruiscono su `Astro.site`
+// (astro.config.mjs). Se il dominio lì è sbagliato, le anteprime non caricano.
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+const ogImage =
+  image && Astro.site ? new URL(image, Astro.site).href : undefined;
 ---
 
 <!doctype html>
@@ -12,6 +33,23 @@ const { description } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     {description && <meta name="description" content={description} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+
+    {/* Open Graph — Threads, Facebook, WhatsApp, LinkedIn… */}
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={ogTitle} />
+    {description && <meta property="og:description" content={description} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    {ogImage && description && <meta property="og:image:alt" content={description} />}
+
+    {/* Twitter/X — usa una card grande con immagine */}
+    <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={ogTitle} />
+    {description && <meta name="twitter:description" content={description} />}
+    {ogImage && <meta name="twitter:image" content={ogImage} />}
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

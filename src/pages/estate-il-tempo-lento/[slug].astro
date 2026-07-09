@@ -33,7 +33,12 @@ const { post } = Astro.props;
 const { Content } = await render(post);
 ---
 
-<Base description={post.data.excerpt}>
+<Base
+  description={post.data.excerpt}
+  image={post.data.image}
+  title={formatItalianDate(post.data.date)}
+  type="article"
+>
   <article class="post">
     <img class="bg" src={post.data.image} alt="" />
     <a class="back" href="/" aria-label="Torna all'archivio">←</a>

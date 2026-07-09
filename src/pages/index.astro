@@ -8,9 +8,15 @@ import { formatItalianDate } from '../utils/date';
 const posts = (await getCollection('posts')).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime()
 );
+
+// Anteprima social della home: l'immagine del post più recente (se esiste).
+const shareImage = posts[0]?.data.image;
 ---
 
-<Base description="Estate, il tempo lento — archivio di testi e immagini.">
+<Base
+  description="Estate, il tempo lento — archivio di testi e immagini."
+  image={shareImage}
+>
   <header class="head">
     <h1>Estate, il tempo lento</h1>
     <p class="intro">
