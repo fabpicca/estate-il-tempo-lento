@@ -23,13 +23,27 @@ export async function getStaticPaths() {
     seen.set(slug, post.id);
   }
 
-  return posts.map((post) => ({
+  // Ordinati dal più recente al più vecchio: da qui ricaviamo i vicini di ogni
+  // post per la navigazione (← post più recente, → post più vecchio).
+  const sorted = [...posts].sort(
+    (a, b) => b.data.date.getTime() - a.data.date.getTime()
+  );
+
+  return sorted.map((post, i) => ({
     params: { slug: dateToSlug(post.data.date) },
-    props: { post },
+    props: {
+      post,
+      newer: sorted[i - 1]
+        ? { slug: dateToSlug(sorted[i - 1].data.date) }
+        : null,
+      older: sorted[i + 1]
+        ? { slug: dateToSlug(sorted[i + 1].data.date) }
+        : null,
+    },
   }));
 }
 
-const { post } = Astro.props;
+const { post, newer, older } = Astro.props;
 const { Content } = await render(post);
 ---
 
@@ -41,7 +55,46 @@ const { Content } = await render(post);
 >
   <article class="post">
     <img class="bg" src={post.data.image} alt="" />
-    <a class="back" href="/" aria-label="Torna all'archivio">←</a>
+    <nav class="nav">
+      {
+        newer && (
+          <a
+            class="nav-btn left"
+            href={`/estate-il-tempo-lento/${newer.slug}`}
+            aria-label="Post più recente"
+          >
+            ←
+          </a>
+        )
+      }
+      <a class="nav-btn home" href="/" aria-label="Torna all'archivio">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 10.5 12 3l9 7.5" />
+          <path d="M5 9.5V21h14V9.5" />
+        </svg>
+      </a>
+      {
+        older && (
+          <a
+            class="nav-btn right"
+            href={`/estate-il-tempo-lento/${older.slug}`}
+            aria-label="Post precedente"
+          >
+            →
+          </a>
+        )
+      }
+    </nav>
     <div class="overlay">
       <div class="text">
         <time class="date" datetime={post.data.date.toISOString()}>
@@ -83,13 +136,18 @@ const { Content } = await render(post);
     }
   }
 
-  .back {
+  .nav-btn {
     position: fixed;
     top: 1rem;
-    left: 1rem;
     z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.1rem;
+    min-height: 2.1rem;
     padding: 0.4rem 0.8rem;
     font-size: 0.9rem;
+    line-height: 1;
     color: #fff;
     text-decoration: none;
     background: rgba(0, 0, 0, 0.35);
@@ -97,8 +155,21 @@ const { Content } = await render(post);
     border-radius: 999px;
   }
 
-  .back:hover,
-  .back:focus-visible {
+  .nav-btn.left {
+    left: 1rem;
+  }
+
+  .nav-btn.home {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .nav-btn.right {
+    right: 1rem;
+  }
+
+  .nav-btn:hover,
+  .nav-btn:focus-visible {
     background: rgba(0, 0, 0, 0.55);
   }
 
