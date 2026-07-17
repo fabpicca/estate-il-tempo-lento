@@ -54,7 +54,9 @@ const { Content } = await render(post);
   type="article"
 >
   <article class="post">
-    <img class="bg" src={post.data.image} alt="" />
+    <div class="bg-wrap">
+      <img class="bg" src={post.data.image} alt="" />
+    </div>
     <nav class="nav">
       {
         newer && (
@@ -116,13 +118,21 @@ const { Content } = await render(post);
     display: flex;
   }
 
-  .bg {
+  /* Il ken burns parte da scale(1.12): senza clip l'immagine sborda oltre il
+     box e genera lo scroll. Clippiamo solo lo sfondo (non l'intero .post), così
+     un eventuale testo più alto del viewport resta scrollabile. */
+  .bg-wrap {
     position: absolute;
     inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .bg {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    z-index: 0;
     transform-origin: center;
     animation: kenburns 18s ease-out both;
   }
