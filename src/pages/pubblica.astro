@@ -1,0 +1,229 @@
+---
+import Base from '../layouts/Base.astro';
+// Form di pubblicazione da mobile. Pagina statica: tutta la logica è client-side
+// e invia a POST /api/publish (la Serverless Function in /api/publish.js).
+// La pagina è pubblica ma inerte senza la password: è l'endpoint a validarla.
+---
+
+<Base description="Pubblica un nuovo post di Estate, il tempo lento.">
+  <main class="wrap">
+    <h1>Nuovo post</h1>
+    <p class="hint">Un post al giorno. L'immagine viene convertita in WebP dal server.</p>
+
+    <form id="form" novalidate>
+      <label>
+        Password
+        <input type="password" name="secret" autocomplete="current-password" required />
+      </label>
+
+      <label>
+        Data
+        <input type="date" name="date" required />
+      </label>
+
+      <label>
+        Testo (excerpt)
+        <textarea name="excerpt" rows="3" required></textarea>
+      </label>
+
+      <label>
+        Immagine
+        <input type="file" name="image" accept="image/*" required />
+      </label>
+
+      <button type="submit" id="submit">Pubblica</button>
+    </form>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </main>
+</Base>
+
+<script>
+  const MAX_EDGE = 2400; // deve combaciare col server (api/publish.js)
+
+  const form = document.getElementById('form') as HTMLFormElement;
+  const statusEl = document.getElementById('status') as HTMLParagraphElement;
+  const submitBtn = document.getElementById('submit') as HTMLButtonElement;
+  const dateInput = form.elements.namedItem('date') as HTMLInputElement;
+
+  // Data di default: oggi (in ora locale).
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  dateInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  // Ridimensiona e ricomprime lato client: tiene la richiesta sotto il limite
+  // di Vercel (~4.5MB) e alleggerisce l'upload. Il server rifà comunque la
+  // conversione WebP autorevole a q82.
+  function fileToWebpBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas non disponibile.'));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('Conversione immagine fallita.'));
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve((reader.result as string).split(',')[1]); // togli il prefisso data:
+            reader.onerror = () => reject(new Error('Lettura immagine fallita.'));
+            reader.readAsDataURL(blob);
+          },
+          'image/webp',
+          0.9
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Immagine non valida.'));
+      };
+      img.src = url;
+    });
+  }
+
+  function setStatus(msg: string, kind: 'ok' | 'err' | 'info' = 'info') {
+    statusEl.textContent = msg;
+    statusEl.dataset.kind = kind;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    setStatus('Preparo l’immagine…', 'info');
+
+    try {
+      const data = new FormData(form);
+      const file = data.get('image') as File;
+      if (!file || !file.size) throw new Error('Seleziona un’immagine.');
+
+      const imageBase64 = await fileToWebpBase64(file);
+      setStatus('Pubblico…', 'info');
+
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: data.get('secret'),
+          date: data.get('date'),
+          excerpt: data.get('excerpt'),
+          image: imageBase64,
+          imageType: 'image/webp',
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `Errore ${res.status}`);
+
+      setStatus(`✓ ${json.message} ${json.url}`, 'ok');
+      form.reset();
+      dateInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    } catch (err) {
+      setStatus((err as Error).message, 'err');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .wrap {
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 4rem;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 2rem;
+    margin: 0 0 0.25rem;
+  }
+
+  .hint {
+    color: var(--muted);
+    margin: 0 0 2rem;
+    font-size: 0.95rem;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  input,
+  textarea {
+    font-family: var(--body);
+    font-size: 1.05rem;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 0.7rem 0.8rem;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  input:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  button {
+    margin-top: 0.5rem;
+    font-family: var(--display);
+    font-size: 1.1rem;
+    color: var(--bg);
+    background: var(--accent);
+    border: none;
+    border-radius: 999px;
+    padding: 0.8rem 1.5rem;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: progress;
+  }
+
+  .status {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    min-height: 1.4em;
+    word-break: break-word;
+  }
+
+  .status[data-kind='ok'] {
+    color: #7bbf6a;
+  }
+
+  .status[data-kind='err'] {
+    color: #d98a8a;
+  }
+
+  .status[data-kind='info'] {
+    color: var(--muted);
+  }
+</style>

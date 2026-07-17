@@ -30,15 +30,31 @@ Nessuna i18n configurata — se in futuro serve l'inglese, va progettata da capo
 - **URL pubblico:** `/estate-il-tempo-lento/dd-mm-yyyy` (es.
   `/estate-il-tempo-lento/08-07-2026`). Formato italiano, generato a build
   time da `src/utils/slug.ts` (`dateToSlug`), non dal filename.
-- **Immagini:** in `public/images/`, nominate con la stessa data
-  (es. `public/images/2026-07-08.jpg`). Path riferito nel frontmatter
-  (`image:`).
+- **Immagini:** in `public/images/`, in formato **WebP**, nominate con la stessa
+  data (es. `public/images/2026-07-08.webp`). Path riferito nel frontmatter
+  (`image:`). Le sorgenti (PNG/JPG dal generatore AI) vanno **converte in WebP**
+  prima del commit — vedi "Pipeline immagini" più sotto. Non committare i PNG
+  originali: appesantiscono il repo per nulla (un PNG ~2.5 MB → WebP ~150 KB).
 - **Frontmatter schema** (`src/content/config.ts`):
   ```yaml
   date: 2026-07-08       # obbligatorio
-  image: "/images/2026-07-08.jpg"   # obbligatorio
+  image: "/images/2026-07-08.webp"   # obbligatorio
   excerpt: "..."          # il testo del post (unico contenuto testuale)
   ```
+
+## Pipeline immagini — WebP
+
+Le immagini sono servite come file statici da `public/images/` (nessun
+`astro:assets` configurato), quindi vanno **già ottimizzate al momento del
+commit**. Formato scelto: **WebP, qualità 82** (buon compromesso qualità/peso
+per foto; ~93% più leggero del PNG sorgente). Strumento: `cwebp` (libwebp).
+
+```bash
+cwebp -q 82 "<SORGENTE>.png" -o "public/images/<DATA>.webp"
+```
+
+Archivio migrato a WebP il 2026-07-16 (12 post, da ~28 MB di PNG a ~2 MB).
+La skill `/nuovo-post` fa già la conversione per i nuovi post.
 
 ## Guardrail già implementato
 
@@ -93,10 +109,43 @@ verificato con `npm run build`.
 
 ## Aggiungere un post
 
-Skill di progetto **`/nuovo-post`** (`.claude/skills/nuovo-post/`): basta fornire
-data, testo e immagine e crea il markdown, copia/converte l'immagine con i nomi
-giusti, valida (un post al giorno, filename = data) e fa il build di verifica.
-Da preferire al lavoro manuale.
+Due modi, stessa destinazione (un commit git → deploy):
+
+1. **Da Claude Code** — skill **`/nuovo-post`** (`.claude/skills/nuovo-post/`):
+   fornisci data, testo e immagine; crea il markdown, converte l'immagine in
+   WebP con i nomi giusti, valida (un post al giorno, filename = data) e fa il
+   build di verifica. Da preferire quando sei al computer.
+
+2. **Da mobile** — pagina **`/pubblica`** + endpoint **`/api/publish.js`**
+   (vedi sotto).
+
+## Pubblicare da mobile — form + micro-backend
+
+Per pubblicare dal telefono senza toccare git: un form (`src/pages/pubblica.astro`,
+statico) invia a una **Vercel Serverless Function** (`api/publish.js`). Il sito
+resta **100% statico**: la cartella `/api` è rilevata da Vercel senza bisogno di
+un adapter Astro.
+
+Flusso: form → `/api/publish` → (verifica password → converte in WebP q82 con
+`sharp` → commit atomico di `.md` + `.webp` su GitHub) → auto-deploy Vercel
+(~30–60s) → post online. Git resta la fonte di verità, quindi serve un token
+GitHub (è la credenziale con cui la function scrive nel repo).
+
+Validazioni lato server = mirror del guardrail di build: data `YYYY-MM-DD` (il
+regex blocca anche il path traversal), **un solo post al giorno** (controlla via
+API se il file esiste già), excerpt e immagine obbligatori.
+
+**Variabili d'ambiente** (Vercel → Project Settings → Environment Variables; mai
+nel codice, vedi `.env.example`):
+
+- `PUBLISH_SECRET` — password del form.
+- `GITHUB_TOKEN` — fine-grained PAT, scope: solo questo repo, Contents R/W.
+- `GITHUB_REPO` — `fabpicca/estate-il-tempo-lento`.
+- `GITHUB_BRANCH` — opzionale, default `main`.
+
+Nota: la function usa `sharp` (dichiarato in `package.json`). L'immagine viene
+ridimensionata (lato lungo max 2400px) sia nel browser — per stare sotto il
+limite di richiesta Vercel (~4.5MB) — sia, in modo autorevole, dal server.
 
 ## Setup rapido
 

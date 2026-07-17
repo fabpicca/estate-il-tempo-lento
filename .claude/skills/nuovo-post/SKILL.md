@@ -1,6 +1,6 @@
 ---
 name: nuovo-post
-description: Aggiunge un nuovo post all'archivio "Estate, il tempo lento". Usa quando l'utente vuole pubblicare/creare/aggiungere un post (una data, un excerpt e un'immagine). Crea il file markdown in src/content/posts/YYYY-MM-DD.md e copia l'immagine in public/images/YYYY-MM-DD.jpg rispettando le convenzioni del progetto, poi verifica con un build.
+description: Aggiunge un nuovo post all'archivio "Estate, il tempo lento". Usa quando l'utente vuole pubblicare/creare/aggiungere un post (una data, un excerpt e un'immagine). Crea il file markdown in src/content/posts/YYYY-MM-DD.md e converte l'immagine in public/images/YYYY-MM-DD.webp rispettando le convenzioni del progetto, poi verifica con un build.
 ---
 
 # Nuovo post — Estate, il tempo lento
@@ -34,29 +34,22 @@ Servono tre cose. Se qualcuna manca, **chiedila** prima di procedere:
   giorno (il build fallirebbe apposta). Chiedi se vuole un'altra data o
   sovrascrivere quello esistente.
 
-## 3. Prepara l'immagine
+## 3. Prepara l'immagine — converti in WebP
 
-**Mantieni il formato originale** (PNG, JPG, ...): NON convertire. Destinazione
-`public/images/YYYY-MM-DD.<ext>`, dove `<ext>` è l'estensione del file sorgente
-(stesso nome della data). Controlla l'estensione reale con `file <SORGENTE>`.
-
-Default: copia e basta.
-
-```bash
-# sostituisci <SORGENTE>, <DATA>, <EXT> (es. png)
-cp "<SORGENTE>" "public/images/<DATA>.<EXT>"
-```
-
-Solo se l'immagine è **molto grande** e l'utente è d'accordo, puoi ridimensionarla
-per tenere il repo leggero, mantenendo il formato (nessun `astro:assets`
-configurato, le immagini sono servite statiche):
+L'archivio usa **WebP** per tutte le immagini (vedi "Pipeline immagini" in
+`CLAUDE.md`): un PNG dal generatore AI pesa ~2.5 MB, in WebP ~150 KB. Converti
+**sempre** in WebP, qualità 82, con destinazione `public/images/YYYY-MM-DD.webp`
+(stesso nome della data). Non copiare il PNG/JPG originale nel repo.
 
 ```bash
-sips -Z 2400 "<SORGENTE>" --out "public/images/<DATA>.<EXT>"
+# sostituisci <SORGENTE> (png/jpg) e <DATA>
+cwebp -q 82 "<SORGENTE>" -o "public/images/<DATA>.webp"
 ```
 
-`-Z 2400` limita il lato lungo a 2400px solo se più grande (non ingrandisce e
-non cambia formato). Verifica sempre l'esito con `file public/images/<DATA>.<EXT>`.
+`cwebp` (libwebp) è già installato. Verifica l'esito con
+`ls -la public/images/<DATA>.webp` (deve essere nell'ordine delle centinaia di
+KB, non dei MB). Se l'immagine è enorme puoi anche limitarne il lato lungo
+aggiungendo `-resize 2400 0` (0 = mantieni proporzioni) prima di `-o`.
 
 ## 4. Crea il file markdown
 
@@ -68,15 +61,15 @@ Il file ha **solo frontmatter**, nessun corpo dopo il `---` di chiusura.
 ```markdown
 ---
 date: YYYY-MM-DD
-image: "/images/YYYY-MM-DD.<ext>"
+image: "/images/YYYY-MM-DD.webp"
 excerpt: "..."
 ---
 ```
 
 Regole del frontmatter (schema in `src/content/config.ts`):
 - `date`: senza virgolette, formato `YYYY-MM-DD`. Obbligatorio.
-- `image`: path pubblico `"/images/YYYY-MM-DD.<ext>"`, con la **stessa estensione**
-  del file copiato al punto 3 (es. `.png`). Obbligatorio.
+- `image`: path pubblico `"/images/YYYY-MM-DD.webp"` (sempre `.webp`, come il
+  file convertito al punto 3). Obbligatorio.
 - `excerpt`: la frase del post. È l'unico testo del pezzo — non aggiungere un
   corpo sotto il frontmatter.
 
